@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Reparameterization Trick</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0b0c10;
+    --surface: #13151b;
+    --surface2: #1c1f2b;
+    --border: #2a2e3f;
+    --accent: #5d9cf5;
+    --accent2: #f5a55d;
+    --accent3: #5df5a5;
+    --red: #f55d7a;
+    --text: #e0e4f0;
+    --muted: #717a9e;
+    --glow: rgba(93,156,245,0.18);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(93,156,245,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(93,156,245,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+    position: relative; z-index: 1;
+  }
+
+  /* Header */
+  .hero {
+    text-align: center;
+    padding: 72px 0 48px;
+  }
+
+  .hero-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 20px;
+    opacity: 0.8;
+  }
+
+  h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(36px, 6vw, 60px);
+    line-height: 1.1;
+    color: #fff;
+    margin-bottom: 16px;
+  }
+
+  h1 em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .hero-sub {
+    color: var(--muted);
+    font-size: 16px;
+    max-width: 560px;
+    margin: 0 auto 40px;
+  }
+
+  /* Steps nav */
+  .steps-nav {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 48px;
+  }
+
+  .step-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 8px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+
+  .step-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .step-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+    font-weight: 500;
+    box-shadow: 0 0 20px var(--glow);
+  }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 36px;
+    margin-bottom: 24px;
+    display: none;
+    animation: fadeIn 0.35s ease;
+  }
+
+  .card.visible { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .step-num {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #3b7de8);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+    font-size: 14px;
+    color: #000;
+    flex-shrink: 0;
+    box-shadow: 0 0 16px var(--glow);
+  }
+
+  .step-num.orange { background: linear-gradient(135deg, var(--accent2), #e87c3b); }
+  .step-num.green  { background: linear-gradient(135deg, var(--accent3), #3be87c); }
+  .step-num.red    { background: linear-gradient(135deg, var(--red), #e83b5d); }
+  .step-num.purple { background: linear-gradient(135deg, #a55df5, #7c3be8); }
+
+  h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 24px;
+    color: #fff;
+    line-height: 1.2;
+  }
+
+  p { color: var(--muted); margin-bottom: 14px; }
+  p:last-child { margin-bottom: 0; }
+  strong { color: var(--text); }
+
+  /* Math blocks */
+  .math-block {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 18px 0;
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    color: var(--accent);
+    overflow-x: auto;
+  }
+
+  .math-block.orange { border-left-color: var(--accent2); color: var(--accent2); }
+  .math-block.red    { border-left-color: var(--red); color: var(--red); }
+  .math-block.green  { border-left-color: var(--accent3); color: var(--accent3); }
+
+  /* Canvas area */
+  .canvas-wrap {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 24px 0 16px;
+    position: relative;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+  }
+
+  .canvas-label {
+    position: absolute;
+    top: 12px; left: 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    margin-top: 20px;
+  }
+
+  .control-group { flex: 1; min-width: 140px; }
+
+  label {
+    display: block;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  input[type=range] {
+    width: 100%;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  .val-display {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--accent);
+    margin-top: 4px;
+  }
+
+  /* Buttons */
+  .btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 22px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+
+  .btn:hover { opacity: 0.85; transform: translateY(-1px); box-shadow: 0 4px 16px var(--glow); }
+  .btn.orange { background: var(--accent2); }
+  .btn.green  { background: var(--accent3); }
+
+  /* Two-col layout */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 20px 0;
+  }
+
+  @media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } }
+
+  .mini-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .mini-box h4 {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  /* Gradient explanation bar */
+  .grad-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 16px 0;
+  }
+
+  .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .dot.blue   { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .dot.orange { background: var(--accent2); box-shadow: 0 0 8px var(--accent2); }
+  .dot.green  { background: var(--accent3); box-shadow: 0 0 8px var(--accent3); }
+  .dot.red    { background: var(--red); box-shadow: 0 0 8px var(--red); }
+
+  .grad-bar span { font-size: 13px; color: var(--muted); }
+  .grad-bar strong { color: var(--text); }
+
+  /* Info tag */
+  .tag {
+    display: inline-block;
+    background: rgba(93,156,245,0.1);
+    border: 1px solid rgba(93,156,245,0.25);
+    color: var(--accent);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+    margin: 4px 4px 4px 0;
+  }
+
+  .tag.orange { background: rgba(245,165,93,0.1); border-color: rgba(245,165,93,0.25); color: var(--accent2); }
+  .tag.green  { background: rgba(93,245,165,0.1); border-color: rgba(93,245,165,0.25); color: var(--accent3); }
+  .tag.red    { background: rgba(245,93,122,0.1); border-color: rgba(245,93,122,0.25); color: var(--red); }
+
+  /* Sample display */
+  #sample-display {
+    font-family: 'DM Mono', monospace;
+    font-size: 22px;
+    color: var(--accent3);
+    text-align: center;
+    padding: 16px;
+    letter-spacing: 1px;
+  }
+
+  /* Nav buttons at bottom */
+  .nav-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 10px 22px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Final summary */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin: 24px 0;
+  }
+
+  .summary-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+  }
+
+  .summary-card .icon { font-size: 22px; margin-bottom: 8px; }
+  .summary-card h4 { font-size: 14px; color: var(--text); margin-bottom: 6px; font-weight: 500; }
+  .summary-card p { font-size: 13px; margin: 0; }
+
+  /* Tooltip */
+  .tooltip {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 8px;
+    text-align: center;
+  }
+
+  /* Gradient flow diagram */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 16px 0;
+    justify-content: center;
+  }
+
+  .flow-node {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    text-align: center;
+  }
+
+  .flow-node.hi { border-color: var(--accent); color: var(--accent); }
+  .flow-node.blocked { border-color: var(--red); color: var(--red); opacity: 0.7; }
+  .flow-node.ok { border-color: var(--accent3); color: var(--accent3); }
+
+  .flow-arrow { color: var(--muted); font-size: 18px; }
+  .flow-arrow.blocked { color: var(--red); }
+  .flow-arrow.ok { color: var(--accent3); }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="hero">
+    <div class="hero-label">Deep Learning · Variational Inference</div>
+    <h1>The <em>Reparameterization</em><br>Trick</h1>
+    <p class="hero-sub">A step-by-step interactive guide to one of the most elegant ideas in modern deep learning — the key that makes VAEs trainable.</p>
+
+    <div class="steps-nav">
+      <button class="step-btn active" onclick="goTo(0)">01 · Problem</button>
+      <button class="step-btn" onclick="goTo(1)">02 · Naive Sample</button>
+      <button class="step-btn" onclick="goTo(2)">03 · Blocked Grad</button>
+      <button class="step-btn" onclick="goTo(3)">04 · The Trick</button>
+      <button class="step-btn" onclick="goTo(4)">05 · Visualization</button>
+      <button class="step-btn" onclick="goTo(5)">06 · VAE Context</button>
+    </div>
+  </div>
+
+  <!-- ── STEP 0: The Problem ── -->
+  <div class="card visible" id="card-0">
+    <div class="card-header">
+      <div class="step-num">01</div>
+      <h2>Why do we need to sample inside a network?</h2>
+    </div>
+
+    <p>In a <strong>Variational Autoencoder (VAE)</strong>, the encoder produces a probability distribution over a latent space — not a single vector. At every forward pass, we <strong>sample</strong> a latent vector <code>z</code> from that distribution.</p>
+
+    <div class="math-block">
+      q<sub>φ</sub>(z | x)  =  𝒩(z ;  μ<sub>φ</sub>(x),  σ²<sub>φ</sub>(x))
+    </div>
+
+    <p>The encoder outputs <strong>μ</strong> (mean) and <strong>σ</strong> (std dev). We then draw <code>z ~ 𝒩(μ, σ²)</code> and decode it to reconstruct <code>x</code>.</p>
+
+    <p>This seems fine — until we try to <strong>train with backpropagation</strong>. The loss depends on <code>z</code>, <code>z</code> is sampled stochastically, and <strong>you cannot backpropagate through a random sampling operation</strong>.</p>
+
+    <div class="two-col">
+      <div class="mini-box">
+        <h4>What we want</h4>
+        <p style="font-size:13px">Gradients of the loss w.r.t. <strong>μ</strong> and <strong>σ</strong> — the encoder's outputs — so we can update the encoder network via SGD.</p>
+      </div>
+      <div class="mini-box">
+        <h4>The problem</h4>
+        <p style="font-size:13px">Sampling is a <strong>stochastic node</strong>. It has no well-defined gradient. The computation graph breaks here.</p>
+      </div>
+    </div>
+
+    <div class="nav-row">
+      <span></span>
+      <button class="btn" onclick="goTo(1)">Next →</button>
+    </div>
+  </div>
+
+  <!-- ── STEP 1: Naive Sampling ── -->
+  <div class="card" id="card-1">
+    <div class="card-header">
+      <div class="step-num orange">02</div>
+      <h2>Naive Sampling — What Goes Wrong</h2>
+    </div>
+
+    <p>The naive approach: just sample directly.</p>
+
+    <div class="math-block orange">z  ~  𝒩(μ, σ²)</div>
+
+    <p>Use the sliders to set the distribution parameters, then sample a <code>z</code>.</p>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>μ (mean)</label>
+        <input type="range" min="-3" max="3" step="0.1" value="1" id="mu-naive" oninput="updateNaive()">
+        <div class="val-display" id="mu-naive-val">1.0</div>
+      </div>
+      <div class="control-group">
+        <label>σ (std dev)</label>
+        <input type="range" min="0.1" max="3" step="0.1" value="1" id="sig-naive" oninput="updateNaive()">
+        <div class="val-display" id="sig-naive-val">1.0</div>
+      </div>
+      <button class="btn orange" onclick="sampleNaive()">Sample z</button>
+    </div>
+
+    <div id="sample-display">z = —</div>
+
+    <div class="canvas-wrap" style="height:200px">
+      <div class="canvas-label">Distribution · p(z)</div>
+      <canvas id="naive-canvas" height="200"></canvas>
+    </div>
+
+    <hr>
+    <p>Notice: each time you press "Sample z", you get a different value. The output <code>z</code> depends on <strong>μ</strong> and <strong>σ</strong> — but through an inherently stochastic process. Backprop needs a <em>deterministic</em> path to carry gradients.</p>
+
+    <div class="nav-row">
+      <button class="btn-ghost" onclick="goTo(0)">← Back</button>
+      <button class="btn orange" onclick="goTo(2)">Next →</button>
+    </div>
+  </div>
+
+  <!-- ── STEP 2: Blocked Gradients ── -->
+  <div class="card" id="card-2">
+    <div class="card-header">
+      <div class="step-num red">03</div>
+      <h2>The Gradient Blockage Problem</h2>
+    </div>
+
+    <p>Backpropagation needs a <strong>deterministic, differentiable</strong> computational path from the loss all the way back to the parameters. A stochastic node breaks this chain.</p>
+
+    <p><strong>Naive forward graph:</strong></p>
+    <div class="flow">
+      <div class="flow-node hi">θ (params)</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node hi">μ, σ</div>
+      <div class="flow-arrow blocked">→</div>
+      <div class="flow-node blocked">sample<br><small>z ~ 𝒩(μ,σ²)</small></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">decoder</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">ℒ (loss)</div>
+    </div>
+
+    <div class="grad-bar">
+      <div class="dot red"></div>
+      <span><strong>Gradient flow is blocked</strong> at the stochastic node. ∂ℒ/∂μ and ∂ℒ/∂σ are undefined.</span>
+    </div>
+
+    <p>More formally, the objective is an <strong>expectation</strong>:</p>
+
+    <div class="math-block red">
+      𝔼<sub>z~q(z|x)</sub>[ f(z) ]
+    </div>
+
+    <p>We want to compute its gradient w.r.t. φ (the parameters that define the distribution). But the sampling distribution itself depends on φ, so naively:</p>
+
+    <div class="math-block red">
+      ∇<sub>φ</sub> 𝔼<sub>z~q<sub>φ</sub>(z|x)</sub>[ f(z) ]  ≠  𝔼<sub>z~q<sub>φ</sub></sub>[ ∇<sub>φ</sub> f(z) ]
+    </div>
+
+    <p>You <strong>can't just pull the gradient inside the expectation</strong> when the distribution depends on the parameter you're differentiating with respect to.</p>
+
+    <div class="two-col">
+      <div class="mini-box">
+        <h4>REINFORCE / Score Function</h4>
+        <p style="font-size:13px">One workaround. Works but has <strong>very high variance</strong> — slow, noisy gradients.</p>
+      </div>
+      <div class="mini-box">
+        <h4>Reparameterization</h4>
+        <p style="font-size:13px">The elegant fix. Low variance, exact gradients, works beautifully in practice.</p>
+      </div>
+    </div>
+
+    <div class="nav-row">
+      <button class="btn-ghost" onclick="goTo(1)">← Back</button>
+      <button class="btn red" onclick="goTo(3)">Next →</button>
+    </div>
+  </div>
+
+  <!-- ── STEP 3: The Trick ── -->
+  <div class="card" id="card-3">
+    <div class="card-header">
+      <div class="step-num green">04</div>
+      <h2>The Reparameterization Trick ✦</h2>
+    </div>
+
+    <p>The key insight: <strong>separate the randomness from the parameters</strong>. Instead of sampling <code>z</code> directly from 𝒩(μ, σ²), sample a "raw" noise variable <code>ε</code> from a fixed standard normal, then <em>deterministically transform</em> it.</p>
+
+    <div class="math-block green">
+      ε  ~  𝒩(0, 1)          &lt;-- sample from FIXED distribution<br>
+      z  =  μ  +  σ · ε       &lt;-- deterministic transform
+    </div>
+
+    <p>Now <code>z</code> still follows 𝒩(μ, σ²) — but the <strong>randomness lives in ε</strong>, which has no parameters. The path from μ and σ to z is now <strong>completely deterministic and differentiable</strong>!</p>
+
+    <div class="flow">
+      <div class="flow-node hi">θ (params)</div>
+      <div class="flow-arrow ok">→</div>
+      <div class="flow-node hi">μ, σ</div>
+      <div class="flow-arrow ok">→</div>
+      <div class="flow-node ok">z = μ + σε</div>
+      <div class="flow-arrow ok">→</div>
+      <div class="flow-node">decoder</div>
+      <div class="flow-arrow ok">→</div>
+      <div class="flow-node">ℒ</div>
+    </div>
+    <div style="text-align:center; margin-top:-8px">
+      <div class="flow">
+        <div class="flow-node" style="border-color:var(--muted); color:var(--muted)">ε ~ 𝒩(0,1)</div>
+        <div class="flow-arrow ok">↗</div>
+      </div>
+    </div>
+
+    <div class="grad-bar">
+      <div class="dot green"></div>
+      <span>Gradients now flow cleanly: <strong>∂z/∂μ = 1</strong> and <strong>∂z/∂σ = ε</strong></span>
+    </div>
+
+    <p>This means:</p>
+    <div class="math-block green">
+      ∂ℒ/∂μ  =  ∂ℒ/∂z · 1<br>
+      ∂ℒ/∂σ  =  ∂ℒ/∂z · ε
+    </div>
+
+    <p>The gradient estimator becomes an expectation over the fixed distribution of ε — which we can now freely push through the expectation sign because ε doesn't depend on φ at all.</p>
+
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="icon">🎲</div>
+        <h4>Noise is external</h4>
+        <p>ε is sampled once, treated as a constant during backprop.</p>
+      </div>
+      <div class="summary-card">
+        <div class="icon">🔗</div>
+        <h4>Deterministic path</h4>
+        <p>μ → z and σ → z are simple arithmetic — fully differentiable.</p>
+      </div>
+      <div class="summary-card">
+        <div class="icon">📉</div>
+        <h4>Low variance</h4>
+        <p>Much lower variance than REINFORCE; training is stable and fast.</p>
+      </div>
+    </div>
+
+    <div class="nav-row">
+      <button class="btn-ghost" onclick="goTo(2)">← Back</button>
+      <button class="btn green" onclick="goTo(4)">Next →</button>
+    </div>
+  </div>
+
+  <!-- ── STEP 4: Interactive Visualization ── -->
+  <div class="card" id="card-4">
+    <div class="card-header">
+      <div class="step-num">05</div>
+      <h2>Interactive: See it Happen</h2>
+    </div>
+
+    <p>Adjust <strong>μ</strong> and <strong>σ</strong> and watch how the transformation <code>z = μ + σ·ε</code> shifts and scales the standard normal into the target distribution.</p>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>μ (mean)</label>
+        <input type="range" min="-3" max="3" step="0.05" value="1.5" id="mu-reparam" oninput="drawReparam()">
+        <div class="val-display" id="mu-reparam-val">1.5</div>
+      </div>
+      <div class="control-group">
+        <label>σ (std dev)</label>
+        <input type="range" min="0.2" max="2.5" step="0.05" value="0.8" id="sig-reparam" oninput="drawReparam()">
+        <div class="val-display" id="sig-reparam-val">0.8</div>
+      </div>
+      <button class="btn" onclick="animateReparam()">Animate ε→z</button>
+    </div>
+
+    <div class="canvas-wrap">
+      <div class="canvas-label">Reparameterization · ε → z = μ + σε</div>
+      <canvas id="reparam-canvas" height="300"></canvas>
+    </div>
+
+    <div class="two-col">
+      <div class="grad-bar">
+        <div class="dot blue"></div>
+        <span>ε ~ <strong>𝒩(0,1)</strong> — fixed, parameter-free</span>
+      </div>
+      <div class="grad-bar">
+        <div class="dot orange"></div>
+        <span>z = μ + σε ~ <strong>𝒩(μ, σ²)</strong></span>
+      </div>
+    </div>
+
+    <div class="tooltip">The arrow shows how each ε sample deterministically maps to a z sample. Drag μ and σ to shift/scale.</div>
+
+    <div class="nav-row">
+      <button class="btn-ghost" onclick="goTo(3)">← Back</button>
+      <button class="btn" onclick="goTo(5)">Next →</button>
+    </div>
+  </div>
+
+  <!-- ── STEP 5: VAE Context ── -->
+  <div class="card" id="card-5">
+    <div class="card-header">
+      <div class="step-num" style="background: linear-gradient(135deg,#a55df5,#7c3be8)">06</div>
+      <h2>Putting it all Together: VAE</h2>
+    </div>
+
+    <p>In a full VAE, the reparameterization trick enables end-to-end training of both the <strong>encoder</strong> and <strong>decoder</strong> jointly.</p>
+
+    <div class="math-block">
+      Full VAE forward pass:<br><br>
+      1.  x  →  Encoder  →  μ<sub>φ</sub>(x), log σ²<sub>φ</sub>(x)<br>
+      2.  ε  ~  𝒩(0, I)          &lt;-- sample noise<br>
+      3.  z  =  μ + σ ⊙ ε         &lt;-- reparameterize<br>
+      4.  z  →  Decoder  →  x̂<br>
+      5.  ℒ  =  ||x - x̂||²  +  KL[ q(z|x) ‖ p(z) ]
+    </div>
+
+    <div class="grad-bar">
+      <div class="dot blue"></div>
+      <span>The <strong>ELBO loss</strong> = reconstruction term + KL divergence regularizer</span>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="icon">🔢</div>
+        <h4>Reconstruction Loss</h4>
+        <p>How well does the decoder reconstruct the input? (MSE or BCE)</p>
+      </div>
+      <div class="summary-card">
+        <div class="icon">📐</div>
+        <h4>KL Divergence</h4>
+        <p>Forces the latent space to be smooth and close to 𝒩(0,I).</p>
+      </div>
+      <div class="summary-card">
+        <div class="icon">⚡</div>
+        <h4>End-to-End</h4>
+        <p>Thanks to the trick, gradients flow through z back to the encoder.</p>
+      </div>
+    </div>
+
+    <p>The KL term has a closed form for Gaussians:</p>
+    <div class="math-block" style="border-left-color:#a55df5; color:#a55df5">
+      KL[ 𝒩(μ,σ²) ‖ 𝒩(0,1) ]  =  ½ · Σ ( 1 + log σ²  -  μ²  -  σ² )
+    </div>
+
+    <p>This is analytically tractable — no sampling needed for the KL term. Only the reconstruction term requires a sample <code>z</code>, and that's where the trick is applied.</p>
+
+    <hr>
+
+    <p><strong>Applications beyond VAEs:</strong></p>
+    <div>
+      <span class="tag">Normalizing Flows</span>
+      <span class="tag">Diffusion Models</span>
+      <span class="tag orange">Stochastic Policies (RL)</span>
+      <span class="tag green">Bayesian Neural Nets</span>
+      <span class="tag red">Latent Diffusion</span>
+      <span class="tag">Score Matching</span>
+    </div>
+
+    <div class="nav-row">
+      <button class="btn-ghost" onclick="goTo(4)">← Back</button>
+      <button class="btn" style="background: linear-gradient(135deg,#a55df5,#5d9cf5); color:#000" onclick="goTo(0)">↺ Start Over</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────
+let currentStep = 0;
+
+function goTo(n) {
+  document.getElementById(`card-${currentStep}`).classList.remove('visible');
+  document.querySelectorAll('.step-btn')[currentStep].classList.remove('active');
+  currentStep = n;
+  document.getElementById(`card-${currentStep}`).classList.add('visible');
+  document.querySelectorAll('.step-btn')[currentStep].classList.add('active');
+  if (n === 1) { updateNaive(); sampleNaive(); }
+  if (n === 4) { setTimeout(drawReparam, 60); }
+}
+
+// ── Utilities ──────────────────────────────────────
+function randn() {
+  let u = 0, v = 0;
+  while (!u) u = Math.random();
+  while (!v) v = Math.random();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+}
+
+function gaussian(x, mu, sigma) {
+  return (1 / (sigma * Math.sqrt(2 * Math.PI))) *
+    Math.exp(-0.5 * ((x - mu) / sigma) ** 2);
+}
+
+// ── Step 1: Naive Canvas ───────────────────────────
+function updateNaive() {
+  const mu = parseFloat(document.getElementById('mu-naive').value);
+  const sig = parseFloat(document.getElementById('sig-naive').value);
+  document.getElementById('mu-naive-val').textContent = mu.toFixed(1);
+  document.getElementById('sig-naive-val').textContent = sig.toFixed(1);
+  drawNaiveCanvas(mu, sig);
+}
+
+function sampleNaive() {
+  const mu = parseFloat(document.getElementById('mu-naive').value);
+  const sig = parseFloat(document.getElementById('sig-naive').value);
+  const z = mu + sig * randn();
+  document.getElementById('sample-display').textContent = `z = ${z.toFixed(4)}`;
+  drawNaiveCanvas(mu, sig, z);
+}
+
+function drawNaiveCanvas(mu, sig, sample) {
+  const canvas = document.getElementById('naive-canvas');
+  const w = canvas.offsetWidth; const h = 200;
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+
+  const xMin = -6, xMax = 6;
+  const toX = x => ((x - xMin) / (xMax - xMin)) * w;
+  const toY = y => h - 10 - y * (h - 30) * 1.8;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  for (let x = xMin; x <= xMax; x++) {
+    ctx.beginPath(); ctx.moveTo(toX(x), 0); ctx.lineTo(toX(x), h); ctx.stroke();
+  }
+
+  // Curve fill
+  ctx.beginPath();
+  for (let i = 0; i <= w; i++) {
+    const x = xMin + (i / w) * (xMax - xMin);
+    const y = gaussian(x, mu, sig);
+    i === 0 ? ctx.moveTo(i, toY(y)) : ctx.lineTo(i, toY(y));
+  }
+  ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, 'rgba(245,165,93,0.35)');
+  grad.addColorStop(1, 'rgba(245,165,93,0.02)');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Curve stroke
+  ctx.beginPath();
+  for (let i = 0; i <= w; i++) {
+    const x = xMin + (i / w) * (xMax - xMin);
+    const y = gaussian(x, mu, sig);
+    i === 0 ? ctx.moveTo(i, toY(y)) : ctx.lineTo(i, toY(y));
+  }
+  ctx.strokeStyle = '#f5a55d';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // μ line
+  ctx.beginPath();
+  ctx.moveTo(toX(mu), 10); ctx.lineTo(toX(mu), h);
+  ctx.strokeStyle = 'rgba(245,165,93,0.5)';
+  ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+  ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = '#f5a55d';
+  ctx.font = '11px DM Mono, monospace';
+  ctx.fillText('μ', toX(mu) + 4, 24);
+
+  // Sample line
+  if (sample !== undefined) {
+    ctx.beginPath();
+    ctx.moveTo(toX(sample), 10); ctx.lineTo(toX(sample), h);
+    ctx.strokeStyle = '#5df5a5';
+    ctx.lineWidth = 2; ctx.setLineDash([]);
+    ctx.stroke();
+    ctx.fillStyle = '#5df5a5';
+    ctx.beginPath();
+    ctx.arc(toX(sample), toY(gaussian(sample, mu, sig)), 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillText('z', toX(sample) + 5, 24);
+  }
+}
+
+// ── Step 4: Reparameterization Canvas ─────────────
+let animId = null;
+
+function drawReparam(animEps) {
+  const mu = parseFloat(document.getElementById('mu-reparam').value);
+  const sig = parseFloat(document.getElementById('sig-reparam').value);
+  document.getElementById('mu-reparam-val').textContent = mu.toFixed(2);
+  document.getElementById('sig-reparam-val').textContent = sig.toFixed(2);
+
+  const canvas = document.getElementById('reparam-canvas');
+  const w = canvas.offsetWidth; const h = 300;
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+
+  const midY = h / 2;
+  const xMin = -5, xMax = 5;
+  const toX = x => ((x - xMin) / (xMax - xMin)) * w;
+
+  // Two rows: top = ε, bottom = z
+  const rowH = 100;
+  const topCenter = h * 0.28;
+  const botCenter = h * 0.72;
+
+  const toYEps = y => topCenter - y * rowH * 1.2;
+  const toYZ   = y => botCenter - y * rowH * 1.2;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Divider
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6, 6]);
+  ctx.beginPath(); ctx.moveTo(0, midY); ctx.lineTo(w, midY); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Labels
+  ctx.fillStyle = '#717a9e';
+  ctx.font = '11px DM Mono, monospace';
+  ctx.fillText('ε ~ 𝒩(0, 1)  [SOURCE]', 14, topCenter - rowH * 1.2 - 6);
+  ctx.fillText('z = μ + σε ~ 𝒩(μ, σ²)  [TARGET]', 14, botCenter - rowH * 1.2 - 6);
+
+  // Draw ε curve (standard normal, fixed)
+  const drawCurve = (toY, mu2, sigma2, color, fillColor) => {
+    ctx.beginPath();
+    for (let i = 0; i <= w; i++) {
+      const x = xMin + (i / w) * (xMax - xMin);
+      const y = gaussian(x, mu2, sigma2);
+      i === 0 ? ctx.moveTo(i, toY(y)) : ctx.lineTo(i, toY(y));
+    }
+    ctx.lineTo(w, toY(0)); ctx.lineTo(0, toY(0)); ctx.closePath();
+    const gr = ctx.createLinearGradient(0, toY(gaussian(mu2, mu2, sigma2)), 0, toY(0));
+    gr.addColorStop(0, fillColor);
+    gr.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gr;
+    ctx.fill();
+    ctx.beginPath();
+    for (let i = 0; i <= w; i++) {
+      const x = xMin + (i / w) * (xMax - xMin);
+      const y = gaussian(x, mu2, sigma2);
+      i === 0 ? ctx.moveTo(i, toY(y)) : ctx.lineTo(i, toY(y));
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+  };
+
+  drawCurve(toYEps, 0, 1,   '#5d9cf5', 'rgba(93,156,245,0.25)');
+  drawCurve(toYZ,   mu, sig, '#f5a55d', 'rgba(245,165,93,0.25)');
+
+  // μ lines
+  const drawVertical = (xVal, toY, col, label) => {
+    ctx.beginPath();
+    ctx.moveTo(toX(xVal), toY(0) - 10); ctx.lineTo(toX(xVal), toY(0) + 30);
+    ctx.strokeStyle = col + '88';
+    ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = col;
+    ctx.font = '11px DM Mono, monospace';
+    ctx.fillText(label, toX(xVal) + 4, toY(0) + 22);
+  };
+
+  drawVertical(0,  toYEps, '#5d9cf5', '0');
+  drawVertical(mu, toYZ,   '#f5a55d', 'μ');
+
+  // Animated arrow
+  if (animEps !== undefined) {
+    const epsPx = toX(animEps);
+    const zVal  = mu + sig * animEps;
+    const zPx   = toX(Math.max(xMin, Math.min(xMax, zVal)));
+
+    const epsY = toYEps(gaussian(animEps, 0, 1));
+    const zY   = toYZ(gaussian(zVal, mu, sig));
+
+    // Dots
+    ctx.beginPath(); ctx.arc(epsPx, epsY, 6, 0, Math.PI*2);
+    ctx.fillStyle = '#5d9cf5'; ctx.fill();
+    ctx.strokeStyle = '#0b0c10'; ctx.lineWidth = 2; ctx.stroke();
+
+    ctx.beginPath(); ctx.arc(zPx, zY, 6, 0, Math.PI*2);
+    ctx.fillStyle = '#f5a55d'; ctx.fill();
+    ctx.strokeStyle = '#0b0c10'; ctx.lineWidth = 2; ctx.stroke();
+
+    // Arrow between them
+    ctx.beginPath();
+    ctx.moveTo(epsPx, epsY + 8);
+    ctx.bezierCurveTo(epsPx, midY - 10, zPx, midY + 10, zPx, zY - 8);
+    ctx.strokeStyle = '#5df5a5';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([]);
+    ctx.stroke();
+
+    // Labels
+    ctx.fillStyle = '#5d9cf5';
+    ctx.font = 'bold 12px DM Mono, monospace';
+    ctx.fillText(`ε=${animEps.toFixed(2)}`, epsPx + 8, epsY);
+    ctx.fillStyle = '#f5a55d';
+    ctx.fillText(`z=${zVal.toFixed(2)}`, zPx + 8, zY);
+  }
+}
+
+function animateReparam() {
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+  const eps = randn();
+  let t = 0;
+  const frames = 45;
+  function step() {
+    const progress = t / frames;
+    const eased = 1 - Math.pow(1 - progress, 3);
+    drawReparam(eps * eased);
+    t++;
+    if (t <= frames) animId = requestAnimationFrame(step);
+  }
+  step();
+}
+
+// ── Init ───────────────────────────────────────────
+window.addEventListener('load', () => {
+  updateNaive();
+  sampleNaive();
+});
+</script>
+</body>
+</html>
