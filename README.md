@@ -3,6 +3,12 @@
 A hands-on, progressive set of exercises to deeply understand the
 reparameterization trick and its role in training Variational Autoencoders.
 
+## 🌐 Interactive Reference
+
+An interactive HTML companion is deployed alongside this repository.
+
+**[→ Open Interactive Explorer](https://reparametrization-trick.vercel.app)**
+
 ---
 
 ## 📁 Structure
